@@ -33,6 +33,7 @@ fn test_flexi_savings_plan() {
     assert!(!plan.is_completed);
 }
 
+#[test]
 fn test_lock_savings_plan() {
     let locked_until = 2000000;
     let plan = SavingsPlan {
@@ -53,6 +54,7 @@ fn test_lock_savings_plan() {
     }
 }
 
+#[test]
 fn test_goal_savings_plan() {
     let plan = SavingsPlan {
         plan_id: 3,
@@ -77,5 +79,35 @@ fn test_goal_savings_plan() {
             assert_eq!(contribution_type, 1u32);
         },
         _ => panic!("Expected Goal plan type"),
+    }
+}
+
+#[test]
+fn test_group_savings_plan() {
+    let plan = SavingsPlan {
+        plan_id: 4,
+        plan_type: PlanType::Group(
+            101,
+            true,
+            2u32,
+            10_000_000
+        ),
+        balance: 3_000_000,
+        start_time: 1000000,
+        last_deposit: 1600000,
+        last_withdraw: 0,
+        interest_rate: 700,
+        is_completed: false,
+    };
+    
+    assert_eq!(plan.plan_id, 4);
+    match plan.plan_type {
+        PlanType::Group(group_id, is_public, contribution_type, target_amount) => {
+            assert_eq!(group_id, 101);
+            assert!(is_public);
+            assert_eq!(contribution_type, 2u32);
+            assert_eq!(target_amount, 10_000_000);
+        },
+        _ => panic!("Expected Group plan type"),
     }
 }
