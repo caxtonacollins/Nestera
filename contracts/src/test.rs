@@ -2,7 +2,7 @@
 extern crate std;
 
 use super::*;
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
+use soroban_sdk::{symbol_short, testutils::{Address as _, Ledger}, Address, Env};
 
 #[test]
 fn test_initialize_sets_admin() {
@@ -145,6 +145,7 @@ fn test_flexi_savings_plan() {
         last_withdraw: 0,
         interest_rate: 500, // 5.00% APY
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 1);
@@ -165,6 +166,7 @@ fn test_lock_savings_plan() {
         last_withdraw: 0,
         interest_rate: 800,
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 2);
@@ -189,6 +191,7 @@ fn test_goal_savings_plan() {
         last_withdraw: 0,
         interest_rate: 600,
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 3);
@@ -213,6 +216,7 @@ fn test_group_savings_plan() {
         last_withdraw: 0,
         interest_rate: 700,
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 4);
@@ -293,6 +297,7 @@ fn test_xdr_compatibility_savings_plan() {
         last_withdraw: 1050000,
         interest_rate: 550,
         is_completed: false,
+        is_withdrawn: false,
     };
 
     let key = symbol_short!("testplan");
@@ -319,6 +324,7 @@ fn test_xdr_compatibility_all_plan_types() {
             last_withdraw: 0,
             interest_rate: 500,
             is_completed: false,
+            is_withdrawn: false,
         };
         env.storage().instance().set(&0u32, &flexi_plan);
         let retrieved: SavingsPlan = env.storage().instance().get(&0u32).unwrap();
@@ -334,6 +340,7 @@ fn test_xdr_compatibility_all_plan_types() {
             last_withdraw: 0,
             interest_rate: 500,
             is_completed: false,
+            is_withdrawn: false,
         };
         env.storage().instance().set(&1u32, &lock_plan);
         let retrieved: SavingsPlan = env.storage().instance().get(&1u32).unwrap();
@@ -349,6 +356,7 @@ fn test_xdr_compatibility_all_plan_types() {
             last_withdraw: 0,
             interest_rate: 500,
             is_completed: false,
+            is_withdrawn: false,
         };
         env.storage().instance().set(&2u32, &goal_plan);
         let retrieved: SavingsPlan = env.storage().instance().get(&2u32).unwrap();
@@ -364,6 +372,7 @@ fn test_xdr_compatibility_all_plan_types() {
             last_withdraw: 0,
             interest_rate: 500,
             is_completed: false,
+            is_withdrawn: false,
         };
         env.storage().instance().set(&3u32, &group_plan);
         let retrieved: SavingsPlan = env.storage().instance().get(&3u32).unwrap();
@@ -382,6 +391,7 @@ fn test_completed_plan() {
         last_withdraw: 0,
         interest_rate: 650,
         is_completed: true,
+        is_withdrawn: false,
     };
 
     assert!(plan.is_completed);
