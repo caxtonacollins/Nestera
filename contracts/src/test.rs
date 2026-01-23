@@ -496,6 +496,7 @@ fn test_flexi_savings_plan() {
         last_withdraw: 0,
         interest_rate: 500, // 5.00% APY
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 1);
@@ -516,6 +517,7 @@ fn test_lock_savings_plan() {
         last_withdraw: 0,
         interest_rate: 800,
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 2);
@@ -540,6 +542,7 @@ fn test_goal_savings_plan() {
         last_withdraw: 0,
         interest_rate: 600,
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 3);
@@ -564,6 +567,7 @@ fn test_group_savings_plan() {
         last_withdraw: 0,
         interest_rate: 700,
         is_completed: false,
+        is_withdrawn: false,
     };
 
     assert_eq!(plan.plan_id, 4);

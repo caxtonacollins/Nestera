@@ -1,6 +1,6 @@
 #![no_std]
 #![allow(non_snake_case)]
-use soroban_sdk::{contract, contractimpl};
+use soroban_sdk::{contract, contractimpl, Address, Env};
 
 mod storage_types;
 
@@ -29,6 +29,9 @@ impl From<ContractError> for soroban_sdk::Error {
         soroban_sdk::Error::from_contract_error(e as u32)
     }
 }
+
+mod errors;
+pub use errors::*;
 
 #[contract]
 pub struct NesteraContract;
