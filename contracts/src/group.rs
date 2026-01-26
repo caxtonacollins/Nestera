@@ -1,5 +1,6 @@
 use crate::errors::SavingsError;
 use crate::storage_types::{DataKey, GroupSave};
+use crate::users;
 use soroban_sdk::{Address, Env, String, Vec};
 
 /// Creates a new group savings plan.
@@ -106,6 +107,16 @@ pub fn create_group_save(
         .persistent()
         .set(&next_id_key, &(group_id + 1u64));
 
+    // Initialize the members list with the creator
+    let members_key = DataKey::GroupMembers(group_id);
+    let mut members = Vec::new(env);
+    members.push_back(creator.clone());
+    env.storage().persistent().set(&members_key, &members);
+
+    // Initialize creator's contribution to 0
+    let contribution_key = DataKey::GroupMemberContribution(group_id, creator.clone());
+    env.storage().persistent().set(&contribution_key, &0i128);
+
     // Add group_id to the creator's UserGroupSaves list
     add_group_to_user_list(env, &creator, group_id)?;
 
@@ -181,4 +192,202 @@ fn add_group_to_user_list(env: &Env, user: &Address, group_id: u64) -> Result<()
     env.storage().persistent().set(&key, &groups);
 
     Ok(())
+}
+
+/// Allows a user to join a public group savings plan.
+///
+/// # Arguments
+/// * `env` - The contract environment
+/// * `user` - The address of the user joining the group
+/// * `group_id` - The ID of the group to join
+///
+/// # Returns
+/// `Ok(())` on success
+/// `Err(SavingsError)` if:
+/// - User doesn't exist
+/// - Group doesn't exist
+/// - Group is not public
+/// - User is already a member
+pub fn join_group_save(
+    env: &Env,
+    user: Address,
+    group_id: u64,
+) -> Result<(), SavingsError> {
+    // Ensure user exists
+    if !users::user_exists(env, &user) {
+        return Err(SavingsError::UserNotFound);
+    }
+
+    // Fetch the group
+    let group_key = DataKey::GroupSave(group_id);
+    let mut group: GroupSave = env
+        .storage()
+        .persistent()
+        .get(&group_key)
+        .ok_or(SavingsError::PlanNotFound)?;
+
+    // Validate that the group is public
+    if !group.is_public {
+        return Err(SavingsError::InvalidGroupConfig);
+    }
+
+    // Check if user is already a member
+    let members_key = DataKey::GroupMembers(group_id);
+    let mut members: Vec<Address> = env
+        .storage()
+        .persistent()
+        .get(&members_key)
+        .unwrap_or(Vec::new(env));
+
+    // Check if user is already a member
+    for i in 0..members.len() {
+        if let Some(member) = members.get(i) {
+            if member == user {
+                return Err(SavingsError::InvalidGroupConfig);
+            }
+        }
+    }
+
+    // Add user to members list
+    members.push_back(user.clone());
+    env.storage().persistent().set(&members_key, &members);
+
+    // Increment member count
+    group.member_count += 1;
+    env.storage().persistent().set(&group_key, &group);
+
+    // Add group to user's list of groups
+    add_group_to_user_list(env, &user, group_id)?;
+
+    // Initialize user's contribution to 0
+    let contribution_key = DataKey::GroupMemberContribution(group_id, user.clone());
+    env.storage().persistent().set(&contribution_key, &0i128);
+
+    // Emit event for joining group
+    env.events().publish(
+        (soroban_sdk::symbol_short!("grp_join"), user),
+        group_id,
+    );
+
+    Ok(())
+}
+
+/// Allows a group member to contribute funds to the group savings plan.
+///
+/// # Arguments
+/// * `env` - The contract environment
+/// * `user` - The address of the user contributing
+/// * `group_id` - The ID of the group
+/// * `amount` - The amount to contribute (must be > 0)
+///
+/// # Returns
+/// `Ok(())` on success
+/// `Err(SavingsError)` if:
+/// - Amount is invalid (<= 0)
+/// - User is not a member
+/// - Group doesn't exist
+pub fn contribute_to_group_save(
+    env: &Env,
+    user: Address,
+    group_id: u64,
+    amount: i128,
+) -> Result<(), SavingsError> {
+    // Validate amount > 0
+    if amount <= 0 {
+        return Err(SavingsError::InvalidAmount);
+    }
+
+    // Fetch the group
+    let group_key = DataKey::GroupSave(group_id);
+    let mut group: GroupSave = env
+        .storage()
+        .persistent()
+        .get(&group_key)
+        .ok_or(SavingsError::PlanNotFound)?;
+
+    // Check if user is a member
+    let members_key = DataKey::GroupMembers(group_id);
+    let members: Vec<Address> = env
+        .storage()
+        .persistent()
+        .get(&members_key)
+        .ok_or(SavingsError::NotGroupMember)?;
+
+    let mut is_member = false;
+    for i in 0..members.len() {
+        if let Some(member) = members.get(i) {
+            if member == user {
+                is_member = true;
+                break;
+            }
+        }
+    }
+
+    if !is_member {
+        return Err(SavingsError::NotGroupMember);
+    }
+
+    // Update user's contribution
+    let contribution_key = DataKey::GroupMemberContribution(group_id, user.clone());
+    let current_contribution: i128 = env
+        .storage()
+        .persistent()
+        .get(&contribution_key)
+        .unwrap_or(0i128);
+    let new_contribution = current_contribution + amount;
+    env.storage()
+        .persistent()
+        .set(&contribution_key, &new_contribution);
+
+    // Update group's current_amount
+    group.current_amount += amount;
+
+    // Check if goal is reached
+    if group.current_amount >= group.target_amount {
+        group.is_completed = true;
+    }
+
+    // Save updated group
+    env.storage().persistent().set(&group_key, &group);
+
+    // Emit event for contribution
+    env.events().publish(
+        (soroban_sdk::symbol_short!("grp_cont"), user, group_id),
+        amount,
+    );
+
+    Ok(())
+}
+
+/// VIEW FUNCTION - Gets a member's contribution to a group
+///
+/// # Arguments
+/// * `env` - The contract environment
+/// * `group_id` - The group ID
+/// * `user` - The user address
+///
+/// # Returns
+/// The member's total contribution amount
+pub fn get_member_contribution(env: &Env, group_id: u64, user: &Address) -> i128 {
+    let contribution_key = DataKey::GroupMemberContribution(group_id, user.clone());
+    env.storage()
+        .persistent()
+        .get(&contribution_key)
+        .unwrap_or(0i128)
+}
+
+/// VIEW FUNCTION - Gets all members of a group
+///
+/// # Arguments
+/// * `env` - The contract environment
+/// * `group_id` - The group ID
+///
+/// # Returns
+/// A vector of member addresses
+pub fn get_group_members(env: &Env, group_id: u64) -> Vec<Address> {
+    let members_key = DataKey::GroupMembers(group_id);
+    env.storage()
+        .persistent()
+        .get(&members_key)
+        .unwrap_or(Vec::new(env))
 }

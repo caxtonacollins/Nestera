@@ -435,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #2)")]
+    #[should_panic(expected = "Error(Contract, #41)")]
     fn test_create_goal_save_invalid_target_amount() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);
@@ -451,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #3)")]
+    #[should_panic(expected = "Error(Contract, #10)")]
     fn test_create_goal_save_user_not_found() {
         let (env, client) = setup_test_env();
         let user = Address::generate(&env);

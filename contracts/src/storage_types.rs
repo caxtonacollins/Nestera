@@ -128,6 +128,10 @@ pub enum DataKey {
     UserGoalSaves(Address),
     /// Stores the next auto-incrementing GoalSave ID
     NextGoalId,
+    /// Maps (group_id, user) to their contribution amount
+    GroupMemberContribution(u64, Address),
+    /// Maps group_id to list of member addresses
+    GroupMembers(u64),
 }
 
 /// Payload structure that the admin signs off-chain
@@ -143,4 +147,42 @@ pub struct MintPayload {
     pub timestamp: u64,
     /// Expiry duration in seconds (signature valid for timestamp + expiry_duration)
     pub expiry_duration: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct LockSave {
+    pub plan_id: u64,
+    pub balance: i128,
+    pub start_time: u64,
+    pub locked_until: u64,
+    pub interest_rate: u32,
+    pub is_withdrawn: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct GoalSave {
+    pub plan_id: u64,
+    pub balance: i128,
+    pub target_amount: i128,
+    pub start_time: u64,
+    pub interest_rate: u32,
+    pub is_completed: bool,
+    pub contribution_type: u32,
+    pub goal_name: Symbol,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub struct GroupSave {
+    pub plan_id: u64,
+    pub balance: i128,
+    pub target_amount: i128,
+    pub start_time: u64,
+    pub interest_rate: u32,
+    pub is_completed: bool,
+    pub is_public: bool,
+    pub contribution_type: u32,
+    pub group_id: u64,
 }
