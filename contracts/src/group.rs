@@ -120,7 +120,12 @@ pub fn create_group_save(
     let now = env.ledger().timestamp();
     let savings_plan = crate::storage_types::SavingsPlan {
         plan_id: group_id,
-        plan_type: crate::storage_types::PlanType::Group(group_id, is_public, contribution_type, target_amount),
+        plan_type: crate::storage_types::PlanType::Group(
+            group_id,
+            is_public,
+            contribution_type,
+            target_amount,
+        ),
         balance: 0,
         start_time: now,
         last_deposit: 0,
@@ -129,7 +134,7 @@ pub fn create_group_save(
         is_completed: false,
         is_withdrawn: false,
     };
-    
+
     let plan_key = DataKey::SavingsPlan(creator.clone(), group_id);
     env.storage().persistent().set(&plan_key, &savings_plan);
 
@@ -274,7 +279,12 @@ pub fn join_group_save(env: &Env, user: Address, group_id: u64) -> Result<(), Sa
     let now = env.ledger().timestamp();
     let savings_plan = crate::storage_types::SavingsPlan {
         plan_id: group_id,
-        plan_type: crate::storage_types::PlanType::Group(group_id, group.is_public, group.contribution_type, group.target_amount),
+        plan_type: crate::storage_types::PlanType::Group(
+            group_id,
+            group.is_public,
+            group.contribution_type,
+            group.target_amount,
+        ),
         balance: 0,
         start_time: now,
         last_deposit: 0,
@@ -283,7 +293,7 @@ pub fn join_group_save(env: &Env, user: Address, group_id: u64) -> Result<(), Sa
         is_completed: group.is_completed,
         is_withdrawn: false,
     };
-    
+
     let plan_key = DataKey::SavingsPlan(user.clone(), group_id);
     env.storage().persistent().set(&plan_key, &savings_plan);
 
@@ -374,7 +384,11 @@ pub fn contribute_to_group_save(
 
     // Update the user's SavingsPlan to reflect the new balance
     let plan_key = DataKey::SavingsPlan(user.clone(), group_id);
-    if let Some(mut plan) = env.storage().persistent().get::<DataKey, crate::storage_types::SavingsPlan>(&plan_key) {
+    if let Some(mut plan) = env
+        .storage()
+        .persistent()
+        .get::<DataKey, crate::storage_types::SavingsPlan>(&plan_key)
+    {
         plan.balance += amount;
         plan.is_completed = group.is_completed;
         plan.last_deposit = env.ledger().timestamp();
@@ -384,7 +398,12 @@ pub fn contribute_to_group_save(
         let now = env.ledger().timestamp();
         let plan = crate::storage_types::SavingsPlan {
             plan_id: group_id,
-            plan_type: crate::storage_types::PlanType::Group(group_id, group.is_public, group.contribution_type, group.target_amount),
+            plan_type: crate::storage_types::PlanType::Group(
+                group_id,
+                group.is_public,
+                group.contribution_type,
+                group.target_amount,
+            ),
             balance: amount,
             start_time: now,
             last_deposit: now,

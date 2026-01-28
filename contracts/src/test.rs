@@ -2369,7 +2369,7 @@ fn test_multiple_members_contribute() {
     // Verify total group amount (from creator's perspective)
     let group = client.get_group_save(&creator, &group_id);
     assert_eq!(group.balance, 1000i128); // creator's own balance
-    // assert_eq!(group.member_count, 3u32);
+                                         // assert_eq!(group.member_count, 3u32);
 
     // Verify all members are in the list
     let members = client.get_group_members(&group_id);
