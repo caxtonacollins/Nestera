@@ -1,6 +1,7 @@
 use crate::errors::SavingsError;
 use crate::flexi;
 use crate::storage_types::{AutoSave, DataKey};
+use crate::ttl;
 use crate::users;
 use soroban_sdk::{Address, Env, Vec};
 
@@ -64,6 +65,10 @@ pub fn create_autosave(
     // Increment the next schedule ID
     increment_next_schedule_id(env);
 
+    // Extend TTL for new schedule and user list
+    ttl::extend_autosave_ttl(env, schedule_id);
+    ttl::extend_user_plan_list_ttl(env, &DataKey::UserAutoSaves(user.clone()));
+
     Ok(schedule_id)
 }
 
@@ -106,7 +111,86 @@ pub fn execute_autosave(env: &Env, schedule_id: u64) -> Result<(), SavingsError>
         .persistent()
         .set(&DataKey::AutoSave(schedule_id), &schedule);
 
+    // Extend TTL on execution (active schedule gets full extension)
+    ttl::extend_autosave_ttl(env, schedule_id);
+
     Ok(())
+}
+
+/// Batch-executes multiple AutoSave schedules that are due.
+///
+/// This function is designed to be called by an external bot or relayer to
+/// process multiple due schedules in a single contract invocation, improving
+/// efficiency and reducing per-call overhead.
+///
+/// # Arguments
+/// * `env` - The contract environment
+/// * `schedule_ids` - A vector of schedule IDs to attempt execution on
+///
+/// # Returns
+/// A `Vec<bool>` where each element corresponds to the schedule at the same
+/// index in `schedule_ids`:
+/// - `true`  — the schedule was due and executed successfully
+/// - `false` — the schedule was skipped (not found, inactive, not yet due, or deposit failed)
+///
+/// # Guarantees
+/// - One failed or skipped schedule does **not** revert the entire batch.
+/// - Only schedules whose `next_execution_time <= current_ledger_timestamp` are executed.
+/// - For each executed schedule, a Flexi deposit is performed and `next_execution_time` is
+///   advanced by `interval_seconds`.
+pub fn execute_due_autosaves(env: &Env, schedule_ids: Vec<u64>) -> Vec<bool> {
+    let current_time = env.ledger().timestamp();
+    let mut results = Vec::new(env);
+
+    for i in 0..schedule_ids.len() {
+        let schedule_id = schedule_ids.get(i).unwrap();
+
+        // Attempt to fetch the schedule; skip if not found
+        let maybe_schedule: Option<AutoSave> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::AutoSave(schedule_id));
+
+        let schedule = match maybe_schedule {
+            Some(s) => s,
+            None => {
+                results.push_back(false);
+                continue;
+            }
+        };
+
+        // Skip inactive schedules
+        if !schedule.is_active {
+            results.push_back(false);
+            continue;
+        }
+
+        // Skip schedules that are not yet due
+        if current_time < schedule.next_execution_time {
+            results.push_back(false);
+            continue;
+        }
+
+        // Attempt the Flexi deposit; if it fails, mark as false and continue
+        let deposit_result =
+            flexi::flexi_deposit(env.clone(), schedule.user.clone(), schedule.amount);
+
+        if deposit_result.is_err() {
+            results.push_back(false);
+            continue;
+        }
+
+        // Update next execution time and persist
+        let mut updated_schedule = schedule.clone();
+        updated_schedule.next_execution_time += updated_schedule.interval_seconds;
+        env.storage()
+            .persistent()
+            .set(&DataKey::AutoSave(schedule_id), &updated_schedule);
+
+        results.push_back(true);
+    }
+
+    results
 }
 
 /// Cancels an AutoSave schedule
@@ -147,33 +231,57 @@ pub fn cancel_autosave(env: &Env, user: Address, schedule_id: u64) -> Result<(),
 
 /// Gets an AutoSave schedule by ID
 pub fn get_autosave(env: &Env, schedule_id: u64) -> Option<AutoSave> {
-    env.storage()
+    let schedule = env
+        .storage()
         .persistent()
-        .get(&DataKey::AutoSave(schedule_id))
+        .get(&DataKey::AutoSave(schedule_id));
+
+    if schedule.is_some() {
+        // Extend TTL on read
+        ttl::extend_autosave_ttl(env, schedule_id);
+    }
+
+    schedule
 }
 
 /// Gets all AutoSave schedule IDs for a user
 pub fn get_user_autosaves(env: &Env, user: &Address) -> Vec<u64> {
-    env.storage()
+    let list_key = DataKey::UserAutoSaves(user.clone());
+    let schedules = env
+        .storage()
         .persistent()
-        .get(&DataKey::UserAutoSaves(user.clone()))
-        .unwrap_or(Vec::new(env))
+        .get(&list_key)
+        .unwrap_or(Vec::new(env));
+
+    // Extend TTL on list access
+    if schedules.len() > 0 {
+        ttl::extend_user_plan_list_ttl(env, &list_key);
+    }
+
+    schedules
 }
 
 // ========== Helper Functions ==========
 
 fn get_next_schedule_id(env: &Env) -> u64 {
-    env.storage()
-        .persistent()
-        .get(&DataKey::NextAutoSaveId)
-        .unwrap_or(1)
+    let counter_key = DataKey::NextAutoSaveId;
+    let id = env.storage().persistent().get(&counter_key).unwrap_or(1);
+
+    // Extend TTL on counter access
+    ttl::extend_counter_ttl(env, &counter_key);
+
+    id
 }
 
 fn increment_next_schedule_id(env: &Env) {
     let current_id = get_next_schedule_id(env);
+    let counter_key = DataKey::NextAutoSaveId;
     env.storage()
         .persistent()
-        .set(&DataKey::NextAutoSaveId, &(current_id + 1));
+        .set(&counter_key, &(current_id + 1));
+
+    // Extend TTL on counter update
+    ttl::extend_counter_ttl(env, &counter_key);
 }
 
 fn add_schedule_to_user(env: &Env, user: &Address, schedule_id: u64) {
@@ -186,4 +294,7 @@ fn add_schedule_to_user(env: &Env, user: &Address, schedule_id: u64) {
 
     schedules.push_back(schedule_id);
     env.storage().persistent().set(&key, &schedules);
+
+    // Extend TTL on list update
+    ttl::extend_user_plan_list_ttl(env, &key);
 }
