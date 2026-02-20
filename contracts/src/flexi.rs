@@ -2,6 +2,7 @@
 use crate::calculate_fee;
 use crate::ensure_not_paused;
 use crate::errors::SavingsError;
+use crate::invariants;
 use crate::storage_types::{DataKey, User};
 use crate::ttl;
 use soroban_sdk::{symbol_short, Address, Env};
@@ -25,7 +26,7 @@ pub fn flexi_deposit(env: Env, user: Address, amount: i128) -> Result<(), Saving
         .get(&DataKey::PlatformFee)
         .unwrap_or(0);
 
-    let fee_amount = calculate_fee(amount, fee_bps);
+    let fee_amount = calculate_fee(amount, fee_bps)?;
     let net_amount = amount
         .checked_sub(fee_amount)
         .ok_or(SavingsError::Underflow)?;
@@ -93,6 +94,12 @@ pub fn flexi_withdraw(env: Env, user: Address, amount: i128) -> Result<(), Savin
         return Err(SavingsError::InvalidAmount);
     }
 
+    // 1. Fetch the balance first
+    let current_balance = get_flexi_balance(&env, user.clone()).unwrap_or(0);
+
+    // 2. Now the variable 'current_balance' exists in this scope
+    invariants::assert_sufficient_balance(current_balance, amount)?;
+
     // 3. Calculate protocol fee
     let fee_bps: u32 = env
         .storage()
@@ -100,7 +107,7 @@ pub fn flexi_withdraw(env: Env, user: Address, amount: i128) -> Result<(), Savin
         .get(&DataKey::PlatformFee)
         .unwrap_or(0);
 
-    let fee_amount = calculate_fee(amount, fee_bps);
+    let fee_amount = calculate_fee(amount, fee_bps)?;
     let _net_amount = amount
         .checked_sub(fee_amount)
         .ok_or(SavingsError::Underflow)?;
