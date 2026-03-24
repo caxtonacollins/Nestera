@@ -30,7 +30,11 @@ export class GovernanceProposal {
   @Column({ nullable: true })
   description: string;
 
-  @Column({ type: 'enum', enum: ProposalStatus, default: ProposalStatus.ACTIVE })
+  @Column({
+    type: 'enum',
+    enum: ProposalStatus,
+    default: ProposalStatus.ACTIVE,
+  })
   status: ProposalStatus;
 
   @Column({ type: 'bigint', nullable: true })

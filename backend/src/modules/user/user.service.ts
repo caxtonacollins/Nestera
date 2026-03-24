@@ -94,7 +94,7 @@ export class UserService {
         'name',
         'bio',
         'avatarUrl',
-        'publicKey',   // exposed on the wire as `walletAddress`
+        'publicKey', // exposed on the wire as `walletAddress`
         'role',
         'kycStatus',
         'createdAt',
@@ -177,7 +177,7 @@ export class UserService {
     const updateData: any = {
       kycStatus: 'APPROVED',
     };
-    
+
     await this.userRepository.update(userId, updateData);
 
     return this.findById(userId);
@@ -202,4 +202,3 @@ export class UserService {
     return { message: 'User deleted successfully' };
   }
 }
-
