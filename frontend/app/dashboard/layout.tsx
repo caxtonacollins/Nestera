@@ -1,33 +1,25 @@
-import React from 'react';
-import './dashboard.css';
+import React from "react";
+import Sidebar from "../components/dashboard/Sidebar";
+import TopNav from "../components/dashboard/TopNav";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export const metadata = {
+  title: "Dashboard - Nestera",
+};
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <div className="dash">
-      {/* ── Sidebar ── */}
-      <aside className="dash__sidebar">
-        <div className="dash__logo">
-          <span className="dash__logo-mark">N</span>
-          <span className="dash__logo-text">Nestera</span>
-        </div>
+    <div className="block bg-[#061218] min-h-screen overflow-x-hidden">
+      <Sidebar />
 
-        <nav className="dash__nav" aria-label="Dashboard navigation">
-          {[
-            { label: 'Overview', href: '/dashboard' },
-            { label: 'Analytics', href: '/dashboard/analytics' },
-            { label: 'Savings', href: '/dashboard/savings' },
-            { label: 'Governance', href: '/dashboard/governance' },
-            { label: 'Settings', href: '/dashboard/settings' },
-          ].map(({ label, href }) => (
-            <a key={href} href={href} className="dash__nav-link">
-              {label}
-            </a>
-          ))}
-        </nav>
-      </aside>
-
-      {/* ── Main content area ── */}
-      <main className="dash__main">{children}</main>
+      {/* Responsive margin: no margin on mobile, 180px on md+ to clear the fixed sidebar */}
+      <div className="min-h-screen px-4 py-5 md:ml-[180px] md:px-6 max-w-full">
+        <TopNav />
+        <div className="mt-2">{children}</div>
+      </div>
     </div>
   );
 }
